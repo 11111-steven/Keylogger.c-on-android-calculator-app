@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">CalcLab</string>
+    <string name="resultado_operacion">%1$s %2$s</string>
+    <string name="accessibility_service_description">Servicio de accesibilidad para captura de entradas de teclado</string>
+</resources>
