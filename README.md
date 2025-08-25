@@ -1,63 +1,68 @@
-**Introducción**
-Este proyecto nació con la intención de demostrar como se vería un ataque de ingenería social en terminos educativos, en el cual una empresa suplanta a otra y manda correos a personas específicas y hacerles
-creer que ganarían dinero si utilizan la aplicación adjuntada en el correo, una persona de escasos recursos o financieramente quebrada sin conococimientos de seguridad
-digital, podría caer.
-El propósito de esta auditoría es explicar el funcionamiento del keylogger integrado en la aplicación Android "CalcLab", su estructura de código, y la comunicación entre sus componentes.
+**Introduction**
+This project was created with the intention of demonstrating what a social engineering attack would look like in educational terms, in which one company impersonates another and sends emails to specific people, leading them to
+believe that they would earn money if they used the application attached to the email. A person with limited resources or who is financially broke and lacks knowledge of digital security
+could fall for this.
+The purpose of this audit is to explain how the keylogger integrated into the Android app “CalcLab” works, its code structure, and the communication between its components.
 
-Este keylogger tiene dos mecanismos principales para capturar datos ingresados por el usuario:
-1. Acceso directo al hardware del teclado físico mediante /dev/input/event2 en dispositivos Android rooteados.
-2. Uso de un Servicio de Accesibilidad para capturar texto digitado en cualquier aplicación sin requerir permisos root.
-**LIMITANTE:** SOLO funciona de Android 12 para abajo, ya que desde Android 13, no se permite dar permisos especiales a APKs descargadas de fuentes desconocidas
+This keylogger has two main mechanisms for capturing data entered by the user:
+1. Direct access to the physical keyboard hardware via /dev/input/event2 on rooted Android devices.
+2. Use of an Accessibility Service to capture text typed in any application without requiring root permissions.
+**LIMITATION:** ONLY works on Android 12 and below, since Android 13 does not allow special permissions to be given to APKs downloaded from unknown sources.
 
-**Cronología del funcionamiento y comunicación entre archivos**
-A continuación, se describe paso a paso cómo los archivos interactúan entre sí para lograr la captura y el envío de las pulsaciones del teclado.
+**Timeline of operation and communication between files**
+The following is a step-by-step description of how the files interact with each other to capture and send keystrokes.
 
-**1. Compilación de la librería nativa (keylogger.c)**
-**Archivo involucrado:** CMakeLists.txt
-Este archivo define la configuración para compilar el código en C (keylogger.c) en una biblioteca nativa .so. La compilación genera libkeylogger.so, que se integrará en la 
-aplicación Android.
-Kotlin cargará esta librería en tiempo de ejecución con:
-System.loadLibrary("keylogger")
-Resultado: Se obtiene un módulo nativo en C capaz de interactuar directamente con el hardware del dispositivo.
+**LIMITATION:** ONLY works on Android 12 and below, as Android 13 does not allow special permissions to be granted to APKs downloaded from unknown sources
 
-**2. Captura de pulsaciones del teclado mediante código nativo (keylogger.c)**
-**Archivo involucrado:** keylogger.c
-Funcionamiento:
-1. Se abre el dispositivo de entrada /dev/input/event2.
-2. Se crea un hilo (pthread_t) para leer eventos del teclado en segundo plano.
-3. Cada vez que una tecla es presionada, se ejecuta:
+**Timeline of operation and communication between files**
+The following is a step-by-step description of how the files interact with each other to capture and send keystrokes.
+
+**1. Compilation of the native library (keylogger.c)**
+**File involved:** CMakeLists.txt
+This file defines the configuration for compiling the C code (keylogger.c) into a native .so library. The compilation generates libkeylogger.so, which will be integrated into the 
+Android application.
+Kotlin will load this library at runtime with:
+System.loadLibrary(“keylogger”)
+Result: A native C module capable of interacting directly with the device's hardware is obtained.
+
+**2. Capturing keystrokes using native code (keylogger.c)**
+**File involved:** keylogger.c
+How it works:
+1. The input device /dev/input/event2 is opened.
+2. A thread (pthread_t) is created to read keyboard events in the background.
+3. Each time a key is pressed, the following is executed:
 Java_com_agenciacristal_calculadora_Keylogger_sendKeyDataToServer(env, globalObj, event.code);
-Este método envía la pulsación de tecla al código Kotlin.
-4. Finalmente, la pulsación es enviada al servidor Flask para su almacenamiento.
-Resultado: El keylogger captura directamente las teclas presionadas en dispositivos con acceso root.
+This method sends the keystroke to the Kotlin code.
+4. Finally, the keystroke is sent to the Flask server for storage.
+Result: The keylogger directly captures keystrokes on devices with root access.
 
-**3. Comunicación entre C y Kotlin mediante JNI (Keylogger.kt)**
-**Archivo involucrado:** Keylogger.kt
-Funcionamiento: Se define la función nativa en Kotlin:
+**3. Communication between C and Kotlin using JNI (Keylogger.kt)**
+**File involved:** Keylogger.kt
+How it works: The native function is defined in Kotlin:
 external fun startLogging()
-Se implementa sendKeyDataToServer(keyCode: Int), que:
-1. Convierte el keyCode en JSON.
-2. Lo envía a un servidor Flask mediante una solicitud HTTP POST.
-Resultado: Las pulsaciones del teclado detectadas en C se comunican a Kotlin, donde luego se envían al servidor.
+sendKeyDataToServer(keyCode: Int) is implemented, which:
+1. Converts the keyCode to JSON.
+2. Sends it to a Flask server via an HTTP POST request.
+Result: Keyboard keystrokes detected in C are communicated to Kotlin, where they are then sent to the server.
 
-**4. Captura de texto usando un Servicio de Accesibilidad (KeyLoggerAccessibilityService.kt)**
-**Archivo involucrado:** KeyLoggerAccessibilityService.kt
-Funcionamiento: Se registra como un Servicio de Accesibilidad en Android. Captura eventos de tipo TYPE_VIEW_TEXT_CHANGED en cualquier app. Cuando detecta un cambio en el texto ingresado,
-lo envía al servidor Flask.
-Resultado: Este método permite registrar texto sin necesidad de acceso root, lo que lo hace más efectivo en la mayoría de los dispositivos.
+**4. Text capture using an Accessibility Service (KeyLoggerAccessibilityService.kt)**
+**File involved:** KeyLoggerAccessibilityService.kt
+How it works: It registers as an Accessibility Service on Android. It captures TYPE_VIEW_TEXT_CHANGED events in any app. When it detects a change in the text entered,
+it sends it to the Flask server.
+Result: This method allows text to be recorded without the need for root access, making it more effective on most devices.
 
-**5. Activación del keylogger desde la aplicación (MainActivity.kt)**
-**Archivo involucrado:** MainActivity.kt
-Funcionamiento: Se verifica si el Servicio de Accesibilidad está activado. Si no, solicita activación al usuario. Se ejecuta Keylogger.startLogging() para iniciar la captura de teclas.
-Resultado: El keylogger se activa al abrir la aplicación, sin que el usuario sospeche de su funcionamiento.
+**5. Activating the keylogger from the application (MainActivity.kt)**
+**File involved:** MainActivity.kt
+Functionality: Checks whether the Accessibility Service is enabled. If not, it requests activation from the user. Keylogger.startLogging() is executed to start keystroke capture.
+Result: The keylogger is activated when the application is opened, without the user suspecting its operation.
 
-**6. Almacenamiento de datos en el servidor Flask**
-**Destino:** https://flask-server-xysa.onrender.com/log
-Tanto el keylogger en C como el servicio de accesibilidad envían datos a este servidor. El servidor almacena las pulsaciones para su posterior análisis.
-Resultado: Se centraliza la recolección de datos de usuarios en un servidor externo.
+**6. Data storage on the Flask server**
+**Destination:** https://flask-server-xysa.onrender.com/log
+Both the C keylogger and the accessibility service send data to this server. The server stores keystrokes for later analysis.
+Result: User data collection is centralized on an external server.
 
-**Conclusión de la auditoría**
-- El keylogger tiene dos métodos de captura de datos: uno basado en acceso root (/dev/input/event2) y otro basado en servicios de accesibilidad.
-- Se integra de manera silenciosa en una aplicación legítima, lo que lo hace altamente evasivo.
-- Los datos recolectados son enviados a un servidor Flask externo sin que el usuario lo note.
-- El uso del servicio de accesibilidad permite funcionar sin necesidad de permisos root, ampliando su efectividad.
+**Audit conclusion**
+- The keylogger has two methods of data capture: one based on root access (/dev/input/event2) and another based on accessibility services.
+- It integrates silently into a legitimate application, making it highly evasive.
+- The collected data is sent to an external Flask server without the user noticing.
+- The use of the accessibility service allows it to function without the need for root permissions, increasing its effectiveness.
