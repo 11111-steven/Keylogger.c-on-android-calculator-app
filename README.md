@@ -12,11 +12,6 @@ This keylogger has two main mechanisms for capturing data entered by the user:
 **Timeline of operation and communication between files**
 The following is a step-by-step description of how the files interact with each other to capture and send keystrokes.
 
-**LIMITATION:** ONLY works on Android 12 and below, as Android 13 does not allow special permissions to be granted to APKs downloaded from unknown sources
-
-**Timeline of operation and communication between files**
-The following is a step-by-step description of how the files interact with each other to capture and send keystrokes.
-
 **1. Compilation of the native library (keylogger.c)**
 **File involved:** CMakeLists.txt
 This file defines the configuration for compiling the C code (keylogger.c) into a native .so library. The compilation generates libkeylogger.so, which will be integrated into the 
